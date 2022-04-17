@@ -7,8 +7,9 @@ using ExcelDataReader;
 using System.Net;
 using System.IO;
 using System.Data;
+using System.Threading.Tasks;
 
-namespace WpfApp1
+namespace lan2
 {
     /// <summary>
     /// Логика взаимодействия для MainWindow.xaml
@@ -16,7 +17,10 @@ namespace WpfApp1
     public partial class MainWindow : Window
     {
         int pageIndex = 1;
+        public bool f1 = false;
+        private const int DelayMs = 1000;
         public const int numberOfRecPerPage = 15;
+        public string np = "";
         private enum PagingMode { First = 1, Next = 2, Previous = 3, Last = 4, PageCountChange = 5 };
         List<List<string>> before = new List<List<string>>();
         List<List<string>> after = new List<List<string>>();
@@ -26,24 +30,45 @@ namespace WpfApp1
         public MainWindow()
         {
             InitializeComponent();
-            this.Loaded += MainWindow_Loaded;
-        }
-
-        public DataTable File5()
-        {
-            WebClient wc = new WebClient();
+            t2.Visibility = Visibility.Hidden;
+            t3.Visibility = Visibility.Hidden;
+            Base.Visibility = Visibility.Hidden;
+            bm1.Visibility = Visibility.Hidden;
+            bm2.Visibility = Visibility.Hidden;
+            tx.Visibility = Visibility.Hidden;
             string path = Directory.GetCurrentDirectory();
             string[] pathTo = path.Split('\\');
-            string np = "";
             for (int i = 0; i < pathTo.Length; i++)
             {
                 np += pathTo[i] + "\\";
-                if (pathTo[i] == "WpfApp1")
+                if (pathTo[i] == "lan2")
                 {
                     break;
                 }
             }
             np += "Base.xlsx";
+            if (!File.Exists(np))
+            {
+                bm1.Visibility = Visibility.Visible;
+                tx.Visibility = Visibility.Visible;
+                bm2.Visibility = Visibility.Visible;
+                if (!f1)
+                {
+                    this.Loaded += MainWindow_Loaded;
+                }
+            }
+            else
+            {
+                t2.Visibility = Visibility.Visible;
+                t3.Visibility = Visibility.Visible;
+                Base.Visibility = Visibility.Visible;
+                this.Loaded += MainWindow_Loaded1;
+            }
+        }
+
+        public DataTable File5()
+        {
+            WebClient wc = new WebClient();
             using (FileStream fs = File.Create(np)) { }
             wc.DownloadFile("https://bdu.fstec.ru/files/documents/thrlist.xlsx", np);
             return ExcelFileReader(np);
@@ -93,6 +118,13 @@ namespace WpfApp1
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             myTable = File5();
+            Base.DataContext = myTable.Rows.Cast<System.Data.DataRow>().Skip(2).Take(numberOfRecPerPage).CopyToDataTable().AsDataView();
+            int count = myTable.Rows.Cast<System.Data.DataRow>().Take(numberOfRecPerPage).Count();
+            lblpageInformation.Content = count + " of " + (myTable.Rows.Count - 2);
+        }
+        private void MainWindow_Loaded1(object sender, RoutedEventArgs e)
+        {
+            myTable = ExcelFileReader(np);
             Base.DataContext = myTable.Rows.Cast<System.Data.DataRow>().Skip(2).Take(numberOfRecPerPage).CopyToDataTable().AsDataView();
             int count = myTable.Rows.Cast<System.Data.DataRow>().Take(numberOfRecPerPage).Count();
             lblpageInformation.Content = count + " of " + (myTable.Rows.Count - 2);
@@ -365,6 +397,20 @@ namespace WpfApp1
             int count = myTable.Rows.Cast<System.Data.DataRow>().Take(numberOfRecPerPage).Count();
             lblpageInformation.Content = count + " of " + (myTable.Rows.Count - 2);
             MessageBox.Show("Статус обновления: " + status + "\n" + "Количество обновлённых записей: " + countNotes + "\n" + s);
+        }
+        private void Click1(object sender, RoutedEventArgs e)
+        {
+            f1 = true;
+            this.Close();
+        }
+        private void Click2(object sender, RoutedEventArgs e)
+        {
+            t2.Visibility = Visibility.Visible;
+            t3.Visibility = Visibility.Visible;
+            Base.Visibility = Visibility.Visible;
+            bm1.Visibility = Visibility.Hidden;
+            bm2.Visibility = Visibility.Hidden;
+            tx.Visibility = Visibility.Hidden;
         }
     }
 }
