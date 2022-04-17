@@ -1,33 +1,28 @@
-﻿using System;
-using System.Collections;
+using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
 using ExcelDataReader;
 using System.Net;
 using System.IO;
 using System.Data;
-using System.ComponentModel;
-using System.Drawing;
 
 namespace WpfApp1
 {
+    /// <summary>
+    /// Логика взаимодействия для MainWindow.xaml
+    /// </summary>
     public partial class MainWindow : Window
     {
         int pageIndex = 1;
         public const int numberOfRecPerPage = 15;
         private enum PagingMode { First = 1, Next = 2, Previous = 3, Last = 4, PageCountChange = 5 };
+        List<List<string>> before = new List<List<string>>();
+        List<List<string>> after = new List<List<string>>();
+        List<List<string>> tema = new List<List<string>>();
         DataTable myTable = new DataTable();
+        DataTable newTable = new DataTable();
         public MainWindow()
         {
             InitializeComponent();
@@ -48,7 +43,7 @@ namespace WpfApp1
                     break;
                 }
             }
-            np += "Base.txt";
+            np += "Base.xlsx";
             using (FileStream fs = File.Create(np)) { }
             wc.DownloadFile("https://bdu.fstec.ru/files/documents/thrlist.xlsx", np);
             return ExcelFileReader(np);
@@ -61,12 +56,17 @@ namespace WpfApp1
             var result = reader.AsDataSet();
             var tables = result.Tables[0];
             tables.Columns.Add("Идентификатор", typeof(String));
-            for (int i = 0; i < tables.Rows.Count; i++)
+            tables.Columns.Add("Наименование угрозы", typeof(String));
+            for (int i = 2; i < tables.Rows.Count; i++)
             {
                 if (tables.Rows[i][0].ToString().Length == 1) tables.Rows[i][10] = "00" + tables.Rows[i][0].ToString();
                 else if (tables.Rows[i][0].ToString().Length == 2) tables.Rows[i][10] = "0" + tables.Rows[i][0].ToString();
                 else tables.Rows[i][10] = tables.Rows[i][0].ToString();
 
+            }
+            for (int i = 0; i < tables.Rows.Count; i++)
+            {
+                tables.Rows[i][11] = tables.Rows[i][1];
             }
             tables.Columns.Remove("Column8");
             tables.Columns.Remove("Column9");
@@ -78,7 +78,7 @@ namespace WpfApp1
             tables.Columns["Column5"].ColumnName = tables.Rows[1][5].ToString();
             tables.Columns["Column6"].ColumnName = tables.Rows[1][6].ToString();
             tables.Columns["Column7"].ColumnName = tables.Rows[1][7].ToString();
-            for (int i = 0; i < tables.Rows.Count; i++)
+            for (int i = 2; i < tables.Rows.Count; i++)
             {
                 if (tables.Rows[i][5].ToString() == "1") tables.Rows[i][5] = "да";
                 else tables.Rows[i][5] = "нет";
@@ -87,6 +87,7 @@ namespace WpfApp1
                 if (tables.Rows[i][7].ToString() == "1") tables.Rows[i][7] = "да";
                 else tables.Rows[i][7] = "нет";
             }
+            stream.Close();
             return tables;
         }
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -112,7 +113,8 @@ namespace WpfApp1
                         {
                             Base.DataContext = null;
                             Base.DataContext = myTable.Rows.Cast<System.Data.DataRow>().Skip((pageIndex *
-                            numberOfRecPerPage + 2) - numberOfRecPerPage).Take(numberOfRecPerPage).CopyToDataTable().AsDataView();
+                            numberOfRecPerPage + 2) -
+                            numberOfRecPerPage).Take(numberOfRecPerPage).CopyToDataTable().AsDataView();
                             count = (pageIndex * numberOfRecPerPage) + (myTable.Rows.Cast<System.Data.DataRow>().Skip(pageIndex * numberOfRecPerPage).Take(numberOfRecPerPage)).Count();
                         }
                         else
@@ -185,7 +187,7 @@ namespace WpfApp1
 
         private void btnCancel_Click(object sender, RoutedEventArgs e)
         {
-            this.Close();
+            updateData();
         }
 
         public void btnFirst_Click(object sender, System.EventArgs e)
@@ -224,7 +226,7 @@ namespace WpfApp1
                     case "Идентификатор":
                         col.Visibility = Visibility.Visible;
                         break;
-                    case "Наименование УБИ":
+                    case "Наименование угрозы":
                         col.Visibility = Visibility.Visible;
                         break;
                     default:
@@ -238,7 +240,18 @@ namespace WpfApp1
         {
             foreach (DataGridColumn col in Base.Columns)
             {
-                col.Visibility = Visibility.Visible;
+                switch (col.Header.ToString())
+                {
+                    case "Идентификатор":
+                        col.Visibility = Visibility.Collapsed;
+                        break;
+                    case "Наименование угрозы":
+                        col.Visibility = Visibility.Collapsed;
+                        break;
+                    default:
+                        col.Visibility = Visibility.Visible;
+                        break;
+                }
             }
         }
 
@@ -247,7 +260,8 @@ namespace WpfApp1
             switch (e.Column.Header.ToString())
             {
                 case "Идентификатор УБИ":
-                    e.Column.Visibility = Visibility.Visible;
+                    e.Column.Visibility =
+                    Visibility.Visible;
                     break;
                 case "Наименование УБИ":
                     e.Column.Visibility = Visibility.Visible;
@@ -273,10 +287,84 @@ namespace WpfApp1
                 case "Идентификатор":
                     e.Column.Visibility = Visibility.Collapsed;
                     break;
+                case "Наименование угрозы":
+                    e.Column.Visibility = Visibility.Collapsed;
+                    break;
                 default:
                     e.Column.Visibility = Visibility.Collapsed;
                     break;
             }
+        }
+
+        private void updateData()
+        {
+            string status, error, s = "";
+            bool fg = false;
+            for (int i = 0; i < 223; i++)
+            {
+                before.Add(new List<string>());
+            }
+            for (int i = 0; i < 223; i++)
+            {
+                after.Add(new List<string>());
+            }
+            for (int i = 0; i < 223; i++)
+            {
+                tema.Add(new List<string>());
+            }
+            DataTable tmpTable = new DataTable();
+            tmpTable = myTable.Copy();
+            int countNotes = 0;
+            newTable = File5();
+            if (newTable != null)
+            {
+                status = "Успешно";
+            }
+            else
+            {
+                status = "Ошибка";
+                error = "Ошибка чтения файла";
+                MessageBox.Show("Статус обновления: " + status + "\n" + "Причина ошибки: " + error);
+            }
+            for (int i = 2; i < newTable.Rows.Count; i++)
+            {
+                fg = false;
+                for (int j = 0; j < 8; j++)
+                {
+                    if (newTable.Rows[i][j].ToString() != tmpTable.Rows[i][j].ToString())
+                    {
+                        before[Convert.ToInt32(newTable.Rows[i][0].ToString())].Add(tmpTable.Rows[i][j].ToString());
+                        after[Convert.ToInt32(newTable.Rows[i][0].ToString())].Add(newTable.Rows[i][j].ToString());
+                        tema[Convert.ToInt32(newTable.Rows[i][0].ToString())].Add(tmpTable.Rows[1][j].ToString());
+                        fg = true;
+                    }
+                }
+                if (fg) countNotes++;
+            }
+            if (countNotes == 0)
+            {
+                MessageBox.Show("Статус обновления: " + status + "\n" + "Количество обновлённых записей: " + countNotes);
+                return;
+            }
+            else
+            {
+                for (int i = 0; i < 223; i++)
+                {
+                    if (before[i].Count() != 0)
+                    {
+                        s += "\nИдентификатор угрозы: " + i + "\nИзменения:\n";
+                        for (int j = 0; j < before[i].Count(); j++)
+                        {
+                            s += tema[i][j].ToString() + ": " + before[i][j].ToString() + " -> " + after[i][j].ToString() + "\n";
+                        }
+                    }
+                }
+            }
+            myTable = tmpTable.Copy();
+            Base.DataContext = myTable.Rows.Cast<System.Data.DataRow>().Skip(2).Take(numberOfRecPerPage).CopyToDataTable().AsDataView();
+            int count = myTable.Rows.Cast<System.Data.DataRow>().Take(numberOfRecPerPage).Count();
+            lblpageInformation.Content = count + " of " + (myTable.Rows.Count - 2);
+            MessageBox.Show("Статус обновления: " + status + "\n" + "Количество обновлённых записей: " + countNotes + "\n" + s);
         }
     }
 }
